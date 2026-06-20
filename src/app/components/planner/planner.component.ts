@@ -68,31 +68,29 @@ import { TaskService, Task } from '../../services/task.service';
                 }
 
                 <!-- Quick add indicator/form in slot -->
-                @if (slot.tasks.length === 0) {
-                  @if (activeSlotAdd() === slot.hourStr) {
-                    <div class="quick-add-form animate-fade">
-                      <input 
-                        type="text" 
-                        placeholder="Block title..." 
-                        [(ngModel)]="quickTaskTitle" 
-                        (keyup.enter)="saveQuickTask(slot.hourStr)"
-                        class="input-control quick-add-input"
-                        #quickInput>
-                      
-                      <select [(ngModel)]="quickPriority" class="priority-select">
-                        <option value="low">Low</option>
-                        <option value="medium">Med</option>
-                        <option value="high">High</option>
-                      </select>
+                @if (activeSlotAdd() === slot.hourStr) {
+                  <div class="quick-add-form animate-fade">
+                    <input 
+                      type="text" 
+                      placeholder="Block title..." 
+                      [(ngModel)]="quickTaskTitle" 
+                      (keyup.enter)="saveQuickTask(slot.hourStr)"
+                      class="input-control quick-add-input"
+                      #quickInput>
+                    
+                    <select [(ngModel)]="quickPriority" class="priority-select">
+                      <option value="low">Low</option>
+                      <option value="medium">Med</option>
+                      <option value="high">High</option>
+                    </select>
 
-                      <button class="btn btn-primary btn-sm" (click)="saveQuickTask(slot.hourStr)">Add</button>
-                      <button class="btn btn-secondary btn-sm" (click)="cancelQuickAdd()">Cancel</button>
-                    </div>
-                  } @else {
-                    <button class="slot-add-placeholder" (click)="startQuickAdd(slot.hourStr)">
-                      + Block Time Slot
-                    </button>
-                  }
+                    <button class="btn btn-primary btn-sm" (click)="saveQuickTask(slot.hourStr)">Add</button>
+                    <button class="btn btn-secondary btn-sm" (click)="cancelQuickAdd()">Cancel</button>
+                  </div>
+                } @else {
+                  <button class="slot-add-placeholder" (click)="startQuickAdd(slot.hourStr)">
+                    + Block Time Slot
+                  </button>
                 }
               </div>
             </div>
@@ -191,7 +189,7 @@ import { TaskService, Task } from '../../services/task.service';
 
     .slot-add-placeholder {
       display: none;
-      width: 100%;
+      flex: 1;
       height: 44px;
       border: 1.5px dashed hsl(var(--border-color));
       background: transparent;
@@ -201,10 +199,12 @@ import { TaskService, Task } from '../../services/task.service';
       font-weight: 500;
       cursor: pointer;
       transition: all var(--transition-fast);
+      align-items: center;
+      justify-content: center;
     }
 
     .schedule-row:hover .slot-add-placeholder {
-      display: block;
+      display: flex;
     }
 
     .slot-add-placeholder:hover {
@@ -300,7 +300,7 @@ import { TaskService, Task } from '../../services/task.service';
       display: flex;
       align-items: center;
       gap: 10px;
-      width: 100%;
+      flex: 1;
       background: hsl(var(--bg-tertiary));
       padding: 8px 12px;
       border-radius: 10px;
