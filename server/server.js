@@ -78,7 +78,7 @@ async function writeDb(data) {
 
 // MongoDB Connection Helper
 let mongoDb = null;
-const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI || process.env.timeblock_MONGODB_URI;
 
 async function getDb() {
   if (mongoDb) return mongoDb;
@@ -99,14 +99,14 @@ async function getDb() {
 initDb();
 
 app.get('/api/db-status', async (req, res) => {
-  const uriExists = !!process.env.MONGODB_URI;
+  const uriExists = !!MONGODB_URI;
   let connected = false;
   let connectionError = null;
   let dbType = 'local-file';
 
   if (uriExists) {
     try {
-      const client = new MongoClient(process.env.MONGODB_URI);
+      const client = new MongoClient(MONGODB_URI);
       await client.connect();
       const testDb = client.db('timeblock');
       await testDb.command({ ping: 1 });
