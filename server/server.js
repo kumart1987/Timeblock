@@ -336,6 +336,116 @@ app.delete('/api/tasks/:id', async (req, res) => {
   res.json({ message: 'Task deleted successfully' });
 });
 
+// --- Diary Endpoints ---
+
+// Get diary entry for a date
+app.get('/api/diary', async (req, res) => {
+  const userId = req.headers['user-id'];
+  const date = req.query.date; // YYYY-MM-DD
+  if (!userId || !date) {
+    return res.status(400).json({ message: 'User ID and Date are required' });
+  }
+
+  const db = await getDb();
+  if (db) {
+    try {
+      const diaryCol = db.collection('diary');
+      const entry = await diaryCol.findOne({ userId, date });
+      return res.json(entry || null);
+    } catch (error) {
+      console.error("MongoDB get diary error:", error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  // Local fallback
+  const localDb = await readDb();
+  if (!localDb.diary) localDb.diary = [];
+  const entry = localDb.diary.find(d => d.userId === userId && d.date === date);
+  res.json(entry || null);
+});
+
+// Save or update diary entry
+app.post('/api/diary', async (req, res) => {
+  const userId = req.headers['user-id'];
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID header is required' });
+  }
+
+  const { date, title, content, mood } = req.body;
+  if (!date) {
+    return res.status(400).json({ message: 'Date is required' });
+  }
+
+  const entryData = {
+    id: req.body.id || Date.now().toString(),
+    userId,
+    date,
+    title: title || '',
+    content: content || '',
+    mood: mood || '',
+    updatedAt: new Date().toISOString()
+  };
+
+  const db = await getDb();
+  if (db) {
+    try {
+      const diaryCol = db.collection('diary');
+      await diaryCol.updateOne(
+        { userId, date },
+        { $set: entryData },
+        { upsert: true }
+      );
+      return res.json(entryData);
+    } catch (error) {
+      console.error("MongoDB save diary error:", error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  // Local fallback
+  const localDb = await readDb();
+  if (!localDb.diary) localDb.diary = [];
+  const entryIndex = localDb.diary.findIndex(d => d.userId === userId && d.date === date);
+
+  if (entryIndex > -1) {
+    localDb.diary[entryIndex] = entryData;
+  } else {
+    localDb.diary.push(entryData);
+  }
+
+  await writeDb(localDb);
+  res.json(entryData);
+});
+
+// Get all diary entries for a user (history list)
+app.get('/api/diary/history', async (req, res) => {
+  const userId = req.headers['user-id'];
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID header is required' });
+  }
+
+  const db = await getDb();
+  if (db) {
+    try {
+      const diaryCol = db.collection('diary');
+      const entries = await diaryCol.find({ userId }).sort({ date: -1 }).toArray();
+      return res.json(entries);
+    } catch (error) {
+      console.error("MongoDB get diary history error:", error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  // Local fallback
+  const localDb = await readDb();
+  if (!localDb.diary) localDb.diary = [];
+  const entries = localDb.diary
+    .filter(d => d.userId === userId)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  res.json(entries);
+});
+
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Local TimeBlock API server running on http://localhost:${PORT}`);

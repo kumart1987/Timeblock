@@ -35,6 +35,10 @@ export const routes: Routes = [
       {
         path: 'settings',
         loadComponent: () => import('./components/settings/settings.component').then(m => m.SettingsComponent)
+      },
+      {
+        path: 'diary',
+        loadComponent: () => import('./components/diary/diary.component').then(m => m.DiaryComponent)
       }
     ]
   },
