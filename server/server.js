@@ -338,7 +338,7 @@ app.delete('/api/tasks/:id', async (req, res) => {
 
 // --- Diary Endpoints ---
 
-// Get diary entry for a date
+// Get diary entries for a date
 app.get('/api/diary', async (req, res) => {
   const userId = req.headers['user-id'];
   const date = req.query.date; // YYYY-MM-DD
@@ -350,8 +350,8 @@ app.get('/api/diary', async (req, res) => {
   if (db) {
     try {
       const diaryCol = db.collection('diary');
-      const entry = await diaryCol.findOne({ userId, date });
-      return res.json(entry || null);
+      const entries = await diaryCol.find({ userId, date }).toArray();
+      return res.json(entries);
     } catch (error) {
       console.error("MongoDB get diary error:", error);
       return res.status(500).json({ message: 'Internal server error' });
@@ -361,8 +361,8 @@ app.get('/api/diary', async (req, res) => {
   // Local fallback
   const localDb = await readDb();
   if (!localDb.diary) localDb.diary = [];
-  const entry = localDb.diary.find(d => d.userId === userId && d.date === date);
-  res.json(entry || null);
+  const entries = localDb.diary.filter(d => d.userId === userId && d.date === date);
+  res.json(entries);
 });
 
 // Save or update diary entry
@@ -372,13 +372,14 @@ app.post('/api/diary', async (req, res) => {
     return res.status(400).json({ message: 'User ID header is required' });
   }
 
-  const { date, title, content, mood } = req.body;
+  const { id, date, title, content, mood } = req.body;
   if (!date) {
     return res.status(400).json({ message: 'Date is required' });
   }
 
+  const entryId = id || Date.now().toString();
   const entryData = {
-    id: req.body.id || Date.now().toString(),
+    id: entryId,
     userId,
     date,
     title: title || '',
@@ -392,7 +393,7 @@ app.post('/api/diary', async (req, res) => {
     try {
       const diaryCol = db.collection('diary');
       await diaryCol.updateOne(
-        { userId, date },
+        { id: entryId, userId },
         { $set: entryData },
         { upsert: true }
       );
@@ -406,7 +407,7 @@ app.post('/api/diary', async (req, res) => {
   // Local fallback
   const localDb = await readDb();
   if (!localDb.diary) localDb.diary = [];
-  const entryIndex = localDb.diary.findIndex(d => d.userId === userId && d.date === date);
+  const entryIndex = localDb.diary.findIndex(d => d.id === entryId && d.userId === userId);
 
   if (entryIndex > -1) {
     localDb.diary[entryIndex] = entryData;
@@ -446,19 +447,19 @@ app.get('/api/diary/history', async (req, res) => {
   res.json(entries);
 });
 
-// Delete diary entry for a date
-app.delete('/api/diary', async (req, res) => {
+// Delete diary entry by ID
+app.delete('/api/diary/:id', async (req, res) => {
   const userId = req.headers['user-id'];
-  const date = req.query.date; // YYYY-MM-DD
-  if (!userId || !date) {
-    return res.status(400).json({ message: 'User ID and Date are required' });
+  const entryId = req.params.id;
+  if (!userId || !entryId) {
+    return res.status(400).json({ message: 'User ID and Entry ID are required' });
   }
 
   const db = await getDb();
   if (db) {
     try {
       const diaryCol = db.collection('diary');
-      const result = await diaryCol.deleteOne({ userId, date });
+      const result = await diaryCol.deleteOne({ id: entryId, userId });
       if (result.deletedCount === 0) {
         return res.status(404).json({ message: 'Entry not found or unauthorized' });
       }
@@ -473,7 +474,7 @@ app.delete('/api/diary', async (req, res) => {
   const localDb = await readDb();
   if (!localDb.diary) localDb.diary = [];
   const initialLength = localDb.diary.length;
-  localDb.diary = localDb.diary.filter(d => !(d.userId === userId && d.date === date));
+  localDb.diary = localDb.diary.filter(d => !(d.id === entryId && d.userId === userId));
 
   if (localDb.diary.length === initialLength) {
     return res.status(404).json({ message: 'Entry not found or unauthorized' });

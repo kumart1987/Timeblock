@@ -1,8 +1,23 @@
-import { Component, inject, signal, computed, OnInit, ElementRef, ViewChild } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DiaryService, DiaryEntry } from '../../services/diary.service';
-import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
+
+export interface ActiveEntryUI {
+  id?: string;
+  date: string;
+  title: string;
+  content: string;
+  mood: string;
+  updatedAt?: string;
+  isEditing: boolean;
+  isSaving?: boolean;
+  backup?: {
+    title: string;
+    content: string;
+    mood: string;
+  };
+}
 
 @Component({
   selector: 'app-diary',
@@ -36,7 +51,7 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
             @for (entry of filteredHistory(); track entry.id) {
               <div 
                 [class.active]="selectedDate() === entry.date"
-                (click)="loadEntryForDate(entry.date)"
+                (click)="loadEntriesForDate(entry.date)"
                 class="history-card">
                 <div class="card-header-row">
                   <span class="entry-date">{{ formatDateShort(entry.date) }}</span>
@@ -54,8 +69,8 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
         </div>
       </aside>
 
-      <!-- Main Editor Panel -->
-      <main class="diary-main glass-panel" [class.readonly-mode]="isReadOnly()">
+      <!-- Main Panel -->
+      <main class="diary-main glass-panel">
         <!-- Date Selector Header -->
         <header class="diary-header">
           <div class="date-selector">
@@ -73,111 +88,118 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
           </div>
           <div class="header-actions">
             <button class="btn btn-secondary" (click)="goToToday()">Today</button>
-            
-            @if (isReadOnly() && entryExists()) {
-              <button class="btn btn-secondary" (click)="enableEdit()" aria-label="Edit diary entry">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 20h9"></path>
-                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                </svg>
-                <span>Edit</span>
-              </button>
-            }
-            
-            @if (!isReadOnly()) {
-              <button class="btn btn-primary" (click)="manualSave()" aria-label="Save diary entry">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                  <polyline points="7 3 7 8 15 8"></polyline>
-                </svg>
-                <span>Save</span>
-              </button>
-              
-              @if (entryExists()) {
-                <button class="btn btn-secondary" (click)="cancelEdit()" aria-label="Cancel editing">
-                  <span>Cancel</span>
-                </button>
-              }
-            }
-            
-            @if (entryExists()) {
-              <button class="btn btn-danger" (click)="deleteCurrentEntry()" aria-label="Delete diary entry">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-                <span>Delete</span>
-              </button>
-            }
+            <button class="btn btn-primary" (click)="addMemory()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>Add Memory</span>
+            </button>
           </div>
         </header>
 
-        <!-- Mood Selector Section -->
-        <section class="mood-selector-wrapper">
-          <label class="section-label">How was your day?</label>
-          <div class="mood-options">
-            @for (m of moods; track m.id) {
-              <button 
-                (click)="setMood(m.id)"
-                [class.selected]="selectedMood() === m.id"
-                [class]="'mood-btn mood-' + m.id"
-                [disabled]="isReadOnly()"
-                [attr.aria-label]="'Feel ' + m.label">
-                <span class="mood-emoji">{{ m.emoji }}</span>
-                <span class="mood-label">{{ m.label }}</span>
-              </button>
-            }
-          </div>
-        </section>
-
-        <!-- Editor Title & Content -->
-        <section class="editor-section">
-          <input 
-            type="text" 
-            placeholder="Give this day a title..." 
-            [(ngModel)]="entryTitle" 
-            (ngModelChange)="onContentChange()"
-            [readonly]="isReadOnly()"
-            class="diary-title-input">
-
-          <div class="textarea-container">
-            <textarea 
-              placeholder="Start writing your story for today here... What did you accomplish? How did you feel?"
-              [(ngModel)]="entryContent"
-              (ngModelChange)="onContentChange()"
-              [readonly]="isReadOnly()"
-              class="diary-textarea"
-              #editorTextarea></textarea>
-            
-            <div class="editor-footer">
-              <span class="word-count">{{ wordCount() }} words</span>
-              <div class="save-status">
-                @if (isReadOnly()) {
-                  <span class="readonly-indicator">
-                    <span class="status-dot"></span> 🔒 Read-Only
-                  </span>
-                } @else {
-                  @if (isSaving()) {
-                    <span class="saving-indicator">
-                      <span class="status-dot saving"></span> Saving...
-                    </span>
-                  } @else if (lastSavedTime()) {
-                    <span class="saved-indicator">
-                      <span class="status-dot saved"></span> Auto-saved {{ lastSavedTime() }}
-                    </span>
-                  } @else {
-                    <span class="draft-indicator">
-                      <span class="status-dot"></span> Unsaved changes
-                    </span>
-                  }
-                }
-              </div>
+        <!-- Memories List -->
+        <div class="memories-list">
+          @if (activeEntries().length === 0) {
+            <div class="empty-memories glass-panel">
+              <span class="empty-icon">✍️</span>
+              <h3>No memories recorded for this day</h3>
+              <p>Capture your thoughts, accomplishments, or feelings for this date.</p>
+              <button class="btn btn-primary" (click)="addMemory()">Start Writing</button>
             </div>
-          </div>
-        </section>
+          } @else {
+            @for (entry of activeEntries(); track entry.id || $index) {
+              <div class="memory-card glass-panel" [class.editing]="entry.isEditing">
+                
+                @if (entry.isEditing) {
+                  <!-- Edit Mode -->
+                  <div class="memory-edit-form">
+                    <!-- Mood Selector -->
+                    <div class="mood-selector-wrapper">
+                      <label class="section-label">How was your day?</label>
+                      <div class="mood-options">
+                        @for (m of moods; track m.id) {
+                          <button 
+                            (click)="setCardMood(entry, m.id)"
+                            [class.selected]="entry.mood === m.id"
+                            [class]="'mood-btn mood-' + m.id"
+                            [attr.aria-label]="'Feel ' + m.label">
+                            <span class="mood-emoji">{{ m.emoji }}</span>
+                            <span class="mood-label">{{ m.label }}</span>
+                          </button>
+                        }
+                      </div>
+                    </div>
+
+                    <!-- Title Input -->
+                    <input 
+                      type="text" 
+                      placeholder="Give this memory a title..." 
+                      [(ngModel)]="entry.title" 
+                      class="diary-title-input">
+
+                    <!-- Content Textarea -->
+                    <div class="textarea-container">
+                      <textarea 
+                        placeholder="Write your story for today here... What did you accomplish? How did you feel?"
+                        [(ngModel)]="entry.content"
+                        class="diary-textarea"></textarea>
+                      
+                      <div class="card-edit-actions">
+                        <span class="word-count">{{ getCardWordCount(entry.content) }} words</span>
+                        <div class="btn-group">
+                          <button class="btn btn-secondary btn-sm" (click)="cancelCardEdit(entry, $index)">Cancel</button>
+                          <button class="btn btn-primary btn-sm" [disabled]="entry.isSaving" (click)="saveCardEntry(entry)">
+                            {{ entry.isSaving ? 'Saving...' : 'Save' }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                } @else {
+                  <!-- View Mode -->
+                  <div class="memory-view-content">
+                    <div class="card-header-row">
+                      <div class="title-mood-row">
+                        <h3 class="memory-card-title">{{ entry.title || 'Untitled Memory' }}</h3>
+                        @if (entry.mood) {
+                          <span class="mood-badge" [class]="'mood-' + entry.mood">
+                            {{ getMoodEmoji(entry.mood) }} {{ getMoodLabel(entry.mood) }}
+                          </span>
+                        }
+                      </div>
+                      @if (entry.updatedAt) {
+                        <span class="updated-time">
+                          Saved {{ formatSavedTime(entry.updatedAt) }}
+                        </span>
+                      }
+                    </div>
+
+                    <p class="memory-card-body">{{ entry.content || 'No description written...' }}</p>
+
+                    <div class="card-view-actions">
+                      <button class="btn btn-secondary btn-sm" (click)="enableCardEdit(entry)" aria-label="Edit memory">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 20h9"></path>
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                        <span>Edit</span>
+                      </button>
+                      <button class="btn btn-danger-link btn-sm" (click)="deleteCardEntry(entry, $index)" aria-label="Delete memory">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                }
+
+              </div>
+            }
+          }
+        </div>
       </main>
     </div>
   `,
@@ -370,11 +392,188 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
       background-color: hsl(var(--border-color));
     }
 
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    /* Memories List */
+    .memories-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .memory-card {
+      background-color: hsl(var(--bg-tertiary));
+      border: 1px solid hsl(var(--border-light));
+      border-radius: 16px;
+      padding: 24px;
+      transition: all var(--transition-normal);
+    }
+
+    .memory-card:hover {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+      border-color: hsl(var(--border-color));
+    }
+
+    .memory-card.editing {
+      border-color: hsl(var(--accent-primary));
+      background-color: rgba(37, 99, 235, 0.02);
+      box-shadow: 0 4px 20px rgba(37, 99, 235, 0.05);
+    }
+
+    .memory-view-content {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .title-mood-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .memory-card-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: hsl(var(--text-primary));
+      margin: 0;
+    }
+
+    .mood-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid hsl(var(--border-color));
+    }
+
+    .mood-badge.mood-happy {
+      background-color: rgba(234, 179, 8, 0.06);
+      color: #eab308;
+      border-color: rgba(234, 179, 8, 0.2);
+    }
+    .mood-badge.mood-productive {
+      background-color: rgba(16, 185, 129, 0.06);
+      color: #10b981;
+      border-color: rgba(16, 185, 129, 0.2);
+    }
+    .mood-badge.mood-tired {
+      background-color: rgba(139, 92, 246, 0.06);
+      color: #8b5cf6;
+      border-color: rgba(139, 92, 246, 0.2);
+    }
+    .mood-badge.mood-calm {
+      background-color: rgba(20, 184, 166, 0.06);
+      color: #20b8a6;
+      border-color: rgba(20, 184, 166, 0.2);
+    }
+    .mood-badge.mood-sad {
+      background-color: rgba(59, 130, 246, 0.06);
+      color: #3b82f6;
+      border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .updated-time {
+      font-size: 0.75rem;
+      color: hsl(var(--text-muted));
+    }
+
+    .memory-card-body {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: hsl(var(--text-secondary));
+      white-space: pre-wrap;
+      margin: 0;
+    }
+
+    .card-view-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 10px;
+      border-top: 1px solid hsl(var(--border-light));
+      padding-top: 12px;
+    }
+
+    .card-edit-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 16px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-sm {
+      padding: 6px 12px !important;
+      font-size: 0.8rem !important;
+      border-radius: 8px !important;
+    }
+
+    .btn-danger-link {
+      background: transparent;
+      color: hsl(var(--accent-danger));
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-danger-link:hover {
+      background-color: rgba(239, 68, 68, 0.06);
+      border-color: rgba(239, 68, 68, 0.15);
+      border-radius: 8px;
+    }
+
+    .empty-memories {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px;
+      text-align: center;
+      border: 1.5px dashed hsl(var(--border-color));
+      border-radius: 20px;
+      background: transparent;
+    }
+
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+    }
+
+    .empty-memories h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .empty-memories p {
+      font-size: 0.85rem;
+      color: hsl(var(--text-muted));
+      margin-bottom: 20px;
+      max-width: 320px;
+    }
+
     /* Mood selector */
     .mood-selector-wrapper {
       display: flex;
       flex-direction: column;
       gap: 10px;
+      margin-bottom: 16px;
     }
 
     .section-label {
@@ -394,12 +593,12 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 16px;
-      border-radius: 12px;
+      padding: 8px 14px;
+      border-radius: 10px;
       border: 1.5px solid hsl(var(--border-color));
-      background-color: hsl(var(--bg-tertiary));
+      background-color: hsl(var(--bg-secondary));
       color: hsl(var(--text-secondary));
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 500;
       cursor: pointer;
       transition: all var(--transition-fast);
@@ -411,7 +610,6 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
       color: hsl(var(--text-primary));
     }
 
-    /* Mood specific glowing classes when selected */
     .mood-happy.selected {
       background-color: rgba(234, 179, 8, 0.08) !important;
       border-color: #eab308 !important;
@@ -444,77 +642,55 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
     }
 
     .mood-emoji {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
     }
 
     /* Editor inputs */
-    .editor-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
     .diary-title-input {
-      font-size: 1.5rem;
+      font-size: 1.35rem;
       font-weight: 700;
       font-family: var(--font-display);
       border: none;
       background: transparent;
       color: hsl(var(--text-primary));
-      padding: 4px 0;
-      border-bottom: 2px solid transparent;
+      padding: 6px 0;
+      border-bottom: 2px solid hsl(var(--border-color));
       outline: none;
       transition: border-color var(--transition-fast);
       width: 100%;
+      margin-bottom: 16px;
     }
 
     .diary-title-input:focus {
-      border-bottom-color: hsl(var(--border-color));
+      border-bottom-color: hsl(var(--accent-primary));
     }
 
     .textarea-container {
-      flex: 1;
       display: flex;
       flex-direction: column;
-      background-color: hsl(var(--bg-tertiary));
+      background-color: hsl(var(--bg-secondary));
       border: 1px solid hsl(var(--border-color));
-      border-radius: 16px;
-      padding: 20px;
+      border-radius: 12px;
+      padding: 16px;
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
-      min-height: 250px;
     }
 
     .diary-textarea {
-      flex: 1;
       border: none;
       background: transparent;
       color: hsl(var(--text-primary));
       font-family: var(--font-sans);
       font-size: 0.95rem;
       line-height: 1.6;
-      resize: none;
+      resize: vertical;
+      min-height: 150px;
       outline: none;
       width: 100%;
-    }
-
-    .editor-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 16px;
-      border-top: 1px solid hsl(var(--border-light));
-      padding-top: 12px;
     }
 
     .word-count {
       font-size: 0.8rem;
       color: hsl(var(--text-muted));
-      font-weight: 500;
-    }
-
-    .save-status {
-      font-size: 0.8rem;
       font-weight: 500;
     }
 
@@ -536,58 +712,6 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
     .status-dot.saved {
       background-color: hsl(var(--accent-success));
     }
-
-    .saving-indicator {
-      color: hsl(var(--text-secondary));
-    }
-
-    .saved-indicator {
-      color: hsl(var(--accent-success));
-    }
-
-    .draft-indicator {
-      color: hsl(var(--text-muted));
-    }
-
-    @keyframes pulse {
-      from { opacity: 0.4; }
-      to { opacity: 1; }
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .readonly-indicator {
-      color: hsl(var(--text-muted));
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-weight: 500;
-    }
-
-    /* Read-only editor styling */
-    .readonly-mode .diary-title-input {
-      border-bottom-color: transparent !important;
-      cursor: default;
-    }
-
-    .readonly-mode .diary-textarea {
-      cursor: default;
-    }
-
-    .readonly-mode .mood-btn {
-      opacity: 0.6;
-      cursor: default;
-      pointer-events: none;
-    }
-
-    .readonly-mode .mood-btn.selected {
-      opacity: 1;
-      pointer-events: none;
-    }
   `]
 })
 export class DiaryComponent implements OnInit {
@@ -596,23 +720,8 @@ export class DiaryComponent implements OnInit {
   searchQuery = '';
   selectedDate = signal<string>(new Date().toISOString().split('T')[0]);
 
-  // Form fields
-  entryTitle = '';
-  entryContent = '';
-  selectedMood = signal<string>('');
-  
-  // Status states
-  isSaving = signal<boolean>(false);
-  lastSavedTime = signal<string>('');
-  isReadOnly = signal<boolean>(true);
-
-  // Computed properties
-  entryExists = computed(() => {
-    return this.diaryService.entries().some(e => e.date === this.selectedDate());
-  });
-
-  // Auto-saving subjects
-  private autoSaveSubject = new Subject<void>();
+  // Form entries for UI list
+  activeEntries = signal<ActiveEntryUI[]>([]);
 
   moods = [
     { id: 'happy', emoji: '😊', label: 'Happy' },
@@ -635,97 +744,143 @@ export class DiaryComponent implements OnInit {
     );
   });
 
-  wordCount = computed(() => {
-    const content = this.entryContent.trim();
-    if (!content) return 0;
-    return content.split(/\s+/).length;
-  });
-
   ngOnInit(): void {
     this.diaryService.loadHistory();
-    this.loadEntryForDate(this.selectedDate());
-
-    // Configure auto-saving logic: debounces keyboard inputs for 1.5 seconds, then autosaves
-    this.autoSaveSubject.pipe(
-      debounceTime(1500),
-      distinctUntilChanged()
-    ).subscribe(() => {
-      this.triggerSave();
-    });
+    this.loadEntriesForDate(this.selectedDate());
   }
 
-  loadEntryForDate(dateStr: string): void {
+  loadEntriesForDate(dateStr: string): void {
     this.selectedDate.set(dateStr);
-    this.diaryService.getEntry(dateStr).subscribe({
-      next: (entry) => {
-        if (entry) {
-          this.entryTitle = entry.title;
-          this.entryContent = entry.content;
-          this.selectedMood.set(entry.mood);
-          this.lastSavedTime.set(this.formatSavedTime(entry.updatedAt));
-          this.isReadOnly.set(true); // Entry exists, view-only mode
-        } else {
-          this.entryTitle = '';
-          this.entryContent = '';
-          this.selectedMood.set('');
-          this.lastSavedTime.set('');
-          this.isReadOnly.set(false); // No entry exists, default to editing mode
-        }
+    this.diaryService.getEntriesForDate(dateStr).subscribe({
+      next: (entries) => {
+        this.activeEntries.set(
+          entries.map(e => ({
+            id: e.id,
+            date: e.date,
+            title: e.title,
+            content: e.content,
+            mood: e.mood,
+            updatedAt: e.updatedAt,
+            isEditing: false
+          }))
+        );
       },
       error: (err) => {
-        console.error('Failed to load diary entry', err);
+        console.error('Failed to load diary entries', err);
       }
     });
   }
 
-  setMood(moodId: string): void {
-    if (this.selectedMood() === moodId) {
-      this.selectedMood.set(''); // toggle off
-    } else {
-      this.selectedMood.set(moodId);
-    }
-    this.onContentChange();
-  }
-
-  onContentChange(): void {
-    // Notify the autosave subject on edit
-    this.lastSavedTime.set(''); // remove saved status while editing
-    this.autoSaveSubject.next();
-  }
-
-  triggerSave(): void {
-    if (this.isReadOnly()) {
-      return;
-    }
-
-    // Do not save completely empty entries
-    if (!this.entryTitle.trim() && !this.entryContent.trim() && !this.selectedMood()) {
-      return;
-    }
-
-    this.isSaving.set(true);
-    const entryToSave: DiaryEntry = {
+  addMemory(): void {
+    const newEntry: ActiveEntryUI = {
       date: this.selectedDate(),
-      title: this.entryTitle.trim(),
-      content: this.entryContent.trim(),
-      mood: this.selectedMood()
+      title: '',
+      content: '',
+      mood: '',
+      isEditing: true
+    };
+    this.activeEntries.update(entries => [...entries, newEntry]);
+  }
+
+  setCardMood(entry: ActiveEntryUI, moodId: string): void {
+    if (entry.mood === moodId) {
+      entry.mood = ''; // toggle off
+    } else {
+      entry.mood = moodId;
+    }
+  }
+
+  getCardWordCount(text: string): number {
+    const content = (text || '').trim();
+    if (!content) return 0;
+    return content.split(/\s+/).length;
+  }
+
+  enableCardEdit(entry: ActiveEntryUI): void {
+    entry.backup = {
+      title: entry.title,
+      content: entry.content,
+      mood: entry.mood
+    };
+    entry.isEditing = true;
+  }
+
+  cancelCardEdit(entry: ActiveEntryUI, index: number): void {
+    if (!entry.id) {
+      // It's a new unsaved entry, remove it
+      this.activeEntries.update(entries => entries.filter((_, idx) => idx !== index));
+    } else {
+      // Revert from backup
+      if (entry.backup) {
+        entry.title = entry.backup.title;
+        entry.content = entry.backup.content;
+        entry.mood = entry.backup.mood;
+      }
+      entry.isEditing = false;
+    }
+  }
+
+  saveCardEntry(entry: ActiveEntryUI): void {
+    if (!entry.title.trim() && !entry.content.trim() && !entry.mood) {
+      alert('Please fill out at least one field (title, mood, or content) before saving.');
+      return;
+    }
+
+    entry.isSaving = true;
+    const entryToSave: DiaryEntry = {
+      id: entry.id,
+      date: entry.date,
+      title: entry.title.trim(),
+      content: entry.content.trim(),
+      mood: entry.mood
     };
 
     this.diaryService.saveEntry(entryToSave).subscribe({
       next: (saved) => {
-        this.isSaving.set(false);
-        this.lastSavedTime.set(this.formatSavedTime(saved.updatedAt));
+        entry.isSaving = false;
+        entry.id = saved.id;
+        entry.updatedAt = saved.updatedAt;
+        entry.isEditing = false;
+        // Reload history sidebar list
+        this.diaryService.loadHistory();
       },
       error: (err) => {
-        this.isSaving.set(false);
-        console.error('Auto-save failed', err);
+        entry.isSaving = false;
+        console.error('Save failed', err);
+        alert('Failed to save memory. Please try again.');
+      }
+    });
+  }
+
+  deleteCardEntry(entry: ActiveEntryUI, index: number): void {
+    if (!entry.id) {
+      // Unsaved new memory, just remove from screen
+      this.activeEntries.update(entries => entries.filter((_, idx) => idx !== index));
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this memory?')) {
+      return;
+    }
+
+    this.diaryService.deleteEntry(entry.id).subscribe({
+      next: () => {
+        this.activeEntries.update(entries => entries.filter((_, idx) => idx !== index));
+      },
+      error: (err) => {
+        console.error('Delete failed', err);
+        alert('Failed to delete memory.');
       }
     });
   }
 
   adjustDate(days: number): void {
-    this.triggerSave(); // Save any pending edits for current day first
-    
+    // Check if there are unsaved new memories
+    const unsaved = this.activeEntries().some(e => e.isEditing && !e.id);
+    if (unsaved && !confirm('You have unsaved memories. Are you sure you want to change dates? Unsaved cards will be lost.')) {
+      return;
+    }
+
     const [y, m, d] = this.selectedDate().split('-');
     const current = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
     current.setDate(current.getDate() + days);
@@ -734,66 +889,16 @@ export class DiaryComponent implements OnInit {
     const month = String(current.getMonth() + 1).padStart(2, '0');
     const day = String(current.getDate()).padStart(2, '0');
 
-    this.loadEntryForDate(`${year}-${month}-${day}`);
+    this.loadEntriesForDate(`${year}-${month}-${day}`);
   }
 
   goToToday(): void {
-    this.triggerSave();
-    this.loadEntryForDate(new Date().toISOString().split('T')[0]);
-  }
-
-  enableEdit(): void {
-    this.isReadOnly.set(false);
-  }
-
-  cancelEdit(): void {
-    this.loadEntryForDate(this.selectedDate());
-  }
-
-  manualSave(): void {
-    if (!this.entryTitle.trim() && !this.entryContent.trim() && !this.selectedMood()) {
+    // Check if there are unsaved new memories
+    const unsaved = this.activeEntries().some(e => e.isEditing && !e.id);
+    if (unsaved && !confirm('You have unsaved memories. Are you sure you want to change dates? Unsaved cards will be lost.')) {
       return;
     }
-
-    this.isSaving.set(true);
-    const entryToSave: DiaryEntry = {
-      date: this.selectedDate(),
-      title: this.entryTitle.trim(),
-      content: this.entryContent.trim(),
-      mood: this.selectedMood()
-    };
-
-    this.diaryService.saveEntry(entryToSave).subscribe({
-      next: (saved) => {
-        this.isSaving.set(false);
-        this.lastSavedTime.set(this.formatSavedTime(saved.updatedAt));
-        this.isReadOnly.set(true); // Lock it upon successful manual save
-      },
-      error: (err) => {
-        this.isSaving.set(false);
-        console.error('Save failed', err);
-      }
-    });
-  }
-
-  deleteCurrentEntry(): void {
-    const date = this.selectedDate();
-    if (!confirm(`Are you sure you want to delete the diary entry for ${this.formatDateReadable(date)}?`)) {
-      return;
-    }
-
-    this.diaryService.deleteEntry(date).subscribe({
-      next: () => {
-        this.entryTitle = '';
-        this.entryContent = '';
-        this.selectedMood.set('');
-        this.lastSavedTime.set('');
-        this.isReadOnly.set(false); // Reset to edit mode as it is now empty
-      },
-      error: (err) => {
-        console.error('Delete failed', err);
-      }
-    });
+    this.loadEntriesForDate(new Date().toISOString().split('T')[0]);
   }
 
   // Formatting helpers
@@ -814,7 +919,7 @@ export class DiaryComponent implements OnInit {
   formatSavedTime(timeStr?: string): string {
     if (!timeStr) return '';
     const date = new Date(timeStr);
-    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
 
   getMoodEmoji(moodId: string): string {
@@ -822,9 +927,9 @@ export class DiaryComponent implements OnInit {
     return found ? found.emoji : '';
   }
 
-  getMoodEmojiAndLabel(moodId: string): string {
+  getMoodLabel(moodId: string): string {
     const found = this.moods.find(m => m.id === moodId);
-    return found ? `${found.emoji} ${found.label}` : '';
+    return found ? found.label : '';
   }
 
   getPreviewText(text: string): string {

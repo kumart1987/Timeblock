@@ -30,8 +30,8 @@ export class DiaryService {
     });
   }
 
-  getEntry(date: string): Observable<DiaryEntry | null> {
-    return this.http.get<DiaryEntry | null>(`/api/diary?date=${date}`, { headers: this.getHeaders() });
+  getEntriesForDate(date: string): Observable<DiaryEntry[]> {
+    return this.http.get<DiaryEntry[]>(`/api/diary?date=${date}`, { headers: this.getHeaders() });
   }
 
   saveEntry(entry: DiaryEntry): Observable<DiaryEntry> {
@@ -40,8 +40,8 @@ export class DiaryService {
     );
   }
 
-  deleteEntry(date: string): Observable<any> {
-    return this.http.delete<any>(`/api/diary?date=${date}`, { headers: this.getHeaders() }).pipe(
+  deleteEntry(id: string): Observable<any> {
+    return this.http.delete<any>(`/api/diary/${id}`, { headers: this.getHeaders() }).pipe(
       tap(() => this.loadHistory())
     );
   }
