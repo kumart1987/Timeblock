@@ -98,6 +98,36 @@ async function getDb() {
 // Ensure local database is initialized at start (fallback)
 initDb();
 
+app.get('/api/db-status', async (req, res) => {
+  const uriExists = !!process.env.MONGODB_URI;
+  let connected = false;
+  let connectionError = null;
+  let dbType = 'local-file';
+
+  if (uriExists) {
+    try {
+      const client = new MongoClient(process.env.MONGODB_URI);
+      await client.connect();
+      const testDb = client.db('timeblock');
+      await testDb.command({ ping: 1 });
+      connected = true;
+      dbType = 'mongodb';
+      await client.close();
+    } catch (err) {
+      connectionError = err.message || String(err);
+    }
+  }
+
+  res.json({
+    dbType,
+    envUriExists: uriExists,
+    connected,
+    connectionError,
+    vercelEnv: !!process.env.VERCEL,
+    kvEnv: !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+  });
+});
+
 // --- Auth Endpoints ---
 
 // Signup
