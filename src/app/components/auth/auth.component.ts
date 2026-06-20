@@ -16,8 +16,12 @@ import { AuthService } from '../../services/auth.service';
       <div class="glass-panel auth-card animate-slide-up">
         <div class="brand">
           <div class="brand-logo">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="8" y="8" width="84" height="84" rx="20" fill="currentColor" fill-opacity="0.05" />
+              <path d="M28 28v44M48 28L30 48l18 24" />
+              <path d="M56 28h24M68 28v44" />
+              <circle cx="78" cy="72" r="10" stroke="currentColor" stroke-width="6" fill="none" />
+              <path d="M78 68v4h4" stroke="currentColor" stroke-width="5" />
             </svg>
           </div>
           <h2>TimeBlock</h2>
