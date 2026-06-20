@@ -84,6 +84,14 @@ import { TaskService, Task } from '../../services/task.service';
                       <option value="high">High</option>
                     </select>
 
+                    <select [(ngModel)]="quickDuration" class="duration-select">
+                      <option [ngValue]="1">1 hr</option>
+                      <option [ngValue]="2">2 hrs</option>
+                      <option [ngValue]="3">3 hrs</option>
+                      <option [ngValue]="4">4 hrs</option>
+                      <option [ngValue]="5">5 hrs</option>
+                    </select>
+
                     <button class="btn btn-primary btn-sm" (click)="saveQuickTask(slot.hourStr)">Add</button>
                     <button class="btn btn-secondary btn-sm" (click)="cancelQuickAdd()">Cancel</button>
                   </div>
@@ -314,9 +322,17 @@ import { TaskService, Task } from '../../services/task.service';
       font-size: 0.85rem;
     }
 
-    .quick-add-form .priority-select {
+    .quick-add-form .priority-select,
+    .quick-add-form .duration-select {
       height: 36px;
       padding: 4px 8px;
+      background: hsl(var(--bg-primary));
+      border: 1px solid hsl(var(--border-color));
+      color: hsl(var(--text-primary));
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
     }
 
     .btn-sm {
@@ -335,6 +351,7 @@ export class PlannerComponent implements OnInit {
   // Quick form state
   quickTaskTitle = '';
   quickPriority = 'medium' as 'high' | 'medium' | 'low';
+  quickDuration = 1;
 
   // Hours list (8:00 to 21:00)
   hours = Array.from({ length: 14 }, (_, i) => i + 8);
@@ -349,7 +366,12 @@ export class PlannerComponent implements OnInit {
 
     return this.hours.map(hour => {
       const hourStr = String(hour).padStart(2, '0') + ':00';
-      const slotTasks = list.filter(t => t.date === date && t.timeBlock.startsWith(String(hour).padStart(2, '0') + ':'));
+      const slotTasks = list.filter(t => {
+        if (t.date !== date) return false;
+        const startHour = parseInt(t.timeBlock.split(':')[0], 10);
+        const duration = t.duration || 1;
+        return startHour <= hour && hour < startHour + duration;
+      });
       
       const ampm = hour >= 12 ? 'PM' : 'AM';
       const displayHour = hour % 12 === 0 ? 12 : hour % 12;
@@ -384,6 +406,7 @@ export class PlannerComponent implements OnInit {
   startQuickAdd(hourStr: string): void {
     this.quickTaskTitle = '';
     this.quickPriority = 'medium';
+    this.quickDuration = 1;
     this.activeSlotAdd.set(hourStr);
   }
 
@@ -400,6 +423,7 @@ export class PlannerComponent implements OnInit {
       description: '',
       date: this.selectedDate(),
       timeBlock: hourStr,
+      duration: this.quickDuration,
       priority: this.quickPriority,
       completed: false
     };

@@ -272,7 +272,7 @@ import { TaskService, Task } from '../../services/task.service';
               </div>
 
               <div class="form-row">
-                <div class="form-group col-6">
+                <div class="form-group" style="flex: 1;">
                   <label class="form-label" for="taskDate">Date</label>
                   <input 
                     type="date" 
@@ -282,7 +282,7 @@ import { TaskService, Task } from '../../services/task.service';
                     [(ngModel)]="newTask.date">
                 </div>
 
-                <div class="form-group col-6">
+                <div class="form-group" style="flex: 1;">
                   <label class="form-label" for="taskTime">Time Slot</label>
                   <input 
                     type="time" 
@@ -290,6 +290,21 @@ import { TaskService, Task } from '../../services/task.service';
                     name="taskTime" 
                     class="input-control" 
                     [(ngModel)]="newTask.timeBlock">
+                </div>
+
+                <div class="form-group" style="flex: 1;">
+                  <label class="form-label" for="taskDuration">Duration</label>
+                  <select 
+                    id="taskDuration" 
+                    name="taskDuration" 
+                    class="input-control" 
+                    [(ngModel)]="newTask.duration">
+                    <option [ngValue]="1">1 hr</option>
+                    <option [ngValue]="2">2 hrs</option>
+                    <option [ngValue]="3">3 hrs</option>
+                    <option [ngValue]="4">4 hrs</option>
+                    <option [ngValue]="5">5 hrs</option>
+                  </select>
                 </div>
               </div>
 
@@ -871,6 +886,7 @@ export class DashboardComponent implements OnInit {
     description: '',
     date: '',
     timeBlock: '09:00',
+    duration: 1,
     priority: 'medium' as 'high' | 'medium' | 'low'
   };
 
@@ -1019,6 +1035,7 @@ export class DashboardComponent implements OnInit {
       description: '',
       date: this.selectedDate(),
       timeBlock: '09:00',
+      duration: 1,
       priority: 'medium'
     };
   }
@@ -1031,6 +1048,7 @@ export class DashboardComponent implements OnInit {
       description: this.newTask.description,
       date: this.newTask.date,
       timeBlock: this.newTask.timeBlock,
+      duration: this.newTask.duration,
       priority: this.newTask.priority,
       completed: false
     };

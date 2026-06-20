@@ -9,6 +9,7 @@ export interface Task {
   title: string;
   description: string;
   timeBlock: string; // "HH:MM"
+  duration?: number; // Duration in hours
   priority: 'high' | 'medium' | 'low';
   date: string; // "YYYY-MM-DD"
   completed: boolean;

@@ -220,7 +220,7 @@ app.post('/api/tasks', async (req, res) => {
     return res.status(400).json({ message: 'User ID header is required' });
   }
 
-  const { id, title, description, timeBlock, priority, date, completed } = req.body;
+  const { id, title, description, timeBlock, duration, priority, date, completed } = req.body;
   if (!title) {
     return res.status(400).json({ message: 'Task title is required' });
   }
@@ -231,6 +231,7 @@ app.post('/api/tasks', async (req, res) => {
     title,
     description: description || '',
     timeBlock: timeBlock || '09:00',
+    duration: duration ? Number(duration) : 1,
     priority: priority || 'medium',
     date: date || new Date().toISOString().split('T')[0],
     completed: completed !== undefined ? completed : false
