@@ -2,6 +2,7 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Task } from '../../services/task.service';
+import { ActivityService } from '../../services/activity.service';
 
 @Component({
   selector: 'app-planner',
@@ -344,6 +345,7 @@ import { TaskService, Task } from '../../services/task.service';
 })
 export class PlannerComponent implements OnInit {
   private readonly taskService = inject(TaskService);
+  private readonly activityService = inject(ActivityService);
 
   selectedDate = signal<string>(new Date().toISOString().split('T')[0]);
   activeSlotAdd = signal<string | null>(null);
@@ -431,18 +433,28 @@ export class PlannerComponent implements OnInit {
     this.taskService.saveTask(task).subscribe({
       next: () => {
         this.cancelQuickAdd();
+        this.activityService.logActivity(`Task "${task.title}" was created`, 'task');
       }
     });
   }
 
   toggleTask(task: Task): void {
     const updated = { ...task, completed: !task.completed };
-    this.taskService.saveTask(updated).subscribe();
+    this.taskService.saveTask(updated).subscribe({
+      next: () => {
+        const action = updated.completed ? 'completed' : 'reopened';
+        this.activityService.logActivity(`Task "${task.title}" was ${action}`, 'task');
+      }
+    });
   }
 
   deleteTask(task: Task): void {
     if (task.id) {
-      this.taskService.deleteTask(task.id).subscribe();
+      this.taskService.deleteTask(task.id).subscribe({
+        next: () => {
+          this.activityService.logActivity(`Task "${task.title}" was deleted`, 'task');
+        }
+      });
     }
   }
 

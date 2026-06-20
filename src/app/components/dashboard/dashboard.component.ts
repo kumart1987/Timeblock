@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Task } from '../../services/task.service';
+import { ActivityService, ActivityLog } from '../../services/activity.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -103,49 +104,82 @@ import { TaskService, Task } from '../../services/task.service';
 
       <!-- Main Columns Grid -->
       <div class="dashboard-grid">
-        <!-- Left Column: Mini Calendar -->
-        <div class="glass-panel grid-card">
-          <div class="card-header">
-            <h3>
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              <span>Calendar</span>
-            </h3>
-            <div class="calendar-nav">
-              <button class="nav-arrow" (click)="adjustMonth(-1)" aria-label="Previous Month">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="15 18 9 12 15 6"></polyline>
+        <!-- Left Column: Calendar & Activity Stack -->
+        <div class="left-column-stack">
+          <!-- Mini Calendar Card -->
+          <div class="glass-panel grid-card">
+            <div class="card-header">
+              <h3>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
                 </svg>
-              </button>
-              <span class="month-year">{{ currentMonthName() }} {{ currentYear() }}</span>
-              <button class="nav-arrow" (click)="adjustMonth(1)" aria-label="Next Month">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </button>
+                <span>Calendar</span>
+              </h3>
+              <div class="calendar-nav">
+                <button class="nav-arrow" (click)="adjustMonth(-1)" aria-label="Previous Month">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <span class="month-year">{{ currentMonthName() }} {{ currentYear() }}</span>
+                <button class="nav-arrow" (click)="adjustMonth(1)" aria-label="Next Month">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="mini-calendar-body">
+              <div class="weekday-header">
+                <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+              </div>
+              <div class="calendar-days-grid">
+                @for (day of calendarDays(); track day.dateString) {
+                  <button 
+                    [class.empty-day]="day.isEmpty"
+                    [class.current-day]="day.isToday"
+                    [class.selected-day]="day.isSelected"
+                    [class.has-tasks]="day.hasTasks"
+                    [disabled]="day.isEmpty"
+                    (click)="selectDate(day.dateString)"
+                    class="calendar-day-btn">
+                    {{ day.dayNum }}
+                  </button>
+                }
+              </div>
             </div>
           </div>
-          <div class="mini-calendar-body">
-            <div class="weekday-header">
-              <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+
+          <!-- Recent Activity Card -->
+          <div class="glass-panel grid-card activity-card">
+            <div class="card-header">
+              <h3>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 8v4l3 3"></path>
+                  <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path>
+                </svg>
+                <span>Recent Activity</span>
+              </h3>
             </div>
-            <div class="calendar-days-grid">
-              @for (day of calendarDays(); track day.dateString) {
-                <button 
-                  [class.empty-day]="day.isEmpty"
-                  [class.current-day]="day.isToday"
-                  [class.selected-day]="day.isSelected"
-                  [class.has-tasks]="day.hasTasks"
-                  [disabled]="day.isEmpty"
-                  (click)="selectDate(day.dateString)"
-                  class="calendar-day-btn">
-                  {{ day.dayNum }}
-                </button>
-              }
+            
+            <div class="activity-viewport">
+              <div 
+                class="activity-list-scrollable" 
+                [class.animating]="isTransitioning()"
+                [style.transform]="'translateY(' + (-currentScrollIndex() * 60) + 'px)'">
+                @for (act of recentActivities(); track act.id) {
+                  <div class="activity-item">
+                    <span class="activity-dot" [class]="act.type"></span>
+                    <div class="activity-details">
+                      <p class="activity-desc">{{ act.description }}</p>
+                      <span class="activity-timestamp">{{ formatRelativeTime(act.timestamp) }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
             </div>
           </div>
         </div>
@@ -471,6 +505,74 @@ import { TaskService, Task } from '../../services/task.service';
       .dashboard-grid {
         grid-template-columns: 1fr;
       }
+    }
+
+    .left-column-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Recent Activity Card Styles */
+    .activity-card {
+      background-color: hsl(var(--bg-secondary));
+    }
+
+    .activity-viewport {
+      height: 120px;
+      overflow: hidden;
+      position: relative;
+      padding: 4px 0;
+    }
+
+    .activity-list-scrollable {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .activity-list-scrollable.animating {
+      transition: transform 0.5s ease-in-out;
+    }
+
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 60px;
+      padding: 8px 0;
+    }
+
+    .activity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .activity-dot.task { background-color: #3b82f6; color: rgba(59, 130, 246, 0.4); }
+    .activity-dot.diary { background-color: #a855f7; color: rgba(168, 85, 247, 0.4); }
+    .activity-dot.system { background-color: #10b981; color: rgba(16, 185, 129, 0.4); }
+
+    .activity-details {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+    }
+
+    .activity-desc {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: hsl(var(--text-primary));
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      margin: 0;
+    }
+
+    .activity-timestamp {
+      font-size: 0.75rem;
+      color: hsl(var(--text-muted));
     }
     
     .grid-card {
@@ -868,8 +970,25 @@ import { TaskService, Task } from '../../services/task.service';
     }
   `]
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private readonly taskService = inject(TaskService);
+  private readonly activityService = inject(ActivityService);
+
+  // Scroll animation states for activities
+  recentActivities = signal<ActivityLog[]>([]);
+  currentScrollIndex = signal<number>(0);
+  isTransitioning = signal<boolean>(false);
+  private autoScrollIntervalId: any;
+
+  constructor() {
+    effect(() => {
+      // Sync dashboard activities with ActivityService changes reactively
+      const logs = this.activityService.activities().slice(0, 5);
+      this.recentActivities.set(logs);
+      this.currentScrollIndex.set(0);
+      this.isTransitioning.set(false);
+    }, { allowSignalWrites: true });
+  }
 
   searchQuery = '';
   priorityFilter = 'all';
@@ -898,6 +1017,58 @@ export class DashboardComponent implements OnInit {
   ngOnInit(): void {
     this.taskService.loadTasks();
     this.resetNewTaskForm();
+    this.initializeActivities();
+  }
+
+  ngOnDestroy(): void {
+    if (this.autoScrollIntervalId) {
+      clearInterval(this.autoScrollIntervalId);
+    }
+  }
+
+  initializeActivities(): void {
+    if (this.autoScrollIntervalId) {
+      clearInterval(this.autoScrollIntervalId);
+    }
+    
+    // Auto-scroll loop every 3.5 seconds
+    this.autoScrollIntervalId = setInterval(() => {
+      this.cycleActivities();
+    }, 3500);
+  }
+
+  cycleActivities(): void {
+    const list = this.recentActivities();
+    if (list.length <= 2) return; // Don't scroll if 2 or fewer items
+
+    this.isTransitioning.set(true);
+    this.currentScrollIndex.set(1);
+
+    setTimeout(() => {
+      this.isTransitioning.set(false);
+      this.recentActivities.update(items => {
+        if (items.length === 0) return [];
+        const [first, ...rest] = items;
+        return [...rest, first];
+      });
+      this.currentScrollIndex.set(0);
+    }, 500); // match transition duration (0.5s)
+  }
+
+  formatRelativeTime(timeStr: string): string {
+    if (!timeStr) return '';
+    const date = new Date(timeStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
   // Task lists matching search & priorities
@@ -1010,12 +1181,21 @@ export class DashboardComponent implements OnInit {
   // Task controls
   toggleTaskCompletion(task: Task): void {
     const updated = { ...task, completed: !task.completed };
-    this.taskService.saveTask(updated).subscribe();
+    this.taskService.saveTask(updated).subscribe({
+      next: () => {
+        const action = updated.completed ? 'completed' : 'reopened';
+        this.activityService.logActivity(`Task "${task.title}" was ${action}`, 'task');
+      }
+    });
   }
 
   deleteTask(task: Task): void {
     if (task.id) {
-      this.taskService.deleteTask(task.id).subscribe();
+      this.taskService.deleteTask(task.id).subscribe({
+        next: () => {
+          this.activityService.logActivity(`Task "${task.title}" was deleted`, 'task');
+        }
+      });
     }
   }
 
@@ -1056,6 +1236,7 @@ export class DashboardComponent implements OnInit {
     this.taskService.saveTask(taskToSave).subscribe({
       next: () => {
         this.closeNewTaskModal();
+        this.activityService.logActivity(`Task "${taskToSave.title}" was created`, 'task');
       },
       error: (err) => {
         console.error('Failed to create task', err);

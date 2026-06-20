@@ -2,6 +2,7 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DiaryService, DiaryEntry } from '../../services/diary.service';
+import { ActivityService } from '../../services/activity.service';
 
 export interface ActiveEntryUI {
   id?: string;
@@ -716,6 +717,7 @@ export interface ActiveEntryUI {
 })
 export class DiaryComponent implements OnInit {
   private readonly diaryService = inject(DiaryService);
+  private readonly activityService = inject(ActivityService);
 
   searchQuery = '';
   selectedDate = signal<string>(new Date().toISOString().split('T')[0]);
@@ -827,6 +829,7 @@ export class DiaryComponent implements OnInit {
     }
 
     entry.isSaving = true;
+    const isEdit = !!entry.id;
     const entryToSave: DiaryEntry = {
       id: entry.id,
       date: entry.date,
@@ -843,6 +846,13 @@ export class DiaryComponent implements OnInit {
         entry.isEditing = false;
         // Reload history sidebar list
         this.diaryService.loadHistory();
+        
+        // Log activity
+        const action = isEdit ? 'updated' : 'created';
+        this.activityService.logActivity(
+          `Diary memory "${saved.title || 'Untitled Memory'}" was ${action}`, 
+          'diary'
+        );
       },
       error: (err) => {
         entry.isSaving = false;
@@ -865,7 +875,14 @@ export class DiaryComponent implements OnInit {
 
     this.diaryService.deleteEntry(entry.id).subscribe({
       next: () => {
+        const deletedTitle = entry.title || 'Untitled Memory';
         this.activeEntries.update(entries => entries.filter((_, idx) => idx !== index));
+        
+        // Log activity
+        this.activityService.logActivity(
+          `Diary memory "${deletedTitle}" was deleted`, 
+          'diary'
+        );
       },
       error: (err) => {
         console.error('Delete failed', err);
