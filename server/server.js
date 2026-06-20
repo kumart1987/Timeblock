@@ -23,7 +23,26 @@ function initDb() {
 }
 
 // Read database
-function readDb() {
+async function readDb() {
+  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    try {
+      const response = await fetch(process.env.KV_REST_API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(['GET', 'timeblock_db'])
+      });
+      const data = await response.json();
+      if (data && data.result) {
+        return JSON.parse(data.result);
+      }
+    } catch (error) {
+      console.error("Error reading from Vercel KV, falling back to local file:", error);
+    }
+  }
+
   initDb();
   try {
     const data = fs.readFileSync(DB_FILE, 'utf8');
@@ -35,7 +54,23 @@ function readDb() {
 }
 
 // Write database
-function writeDb(data) {
+async function writeDb(data) {
+  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    try {
+      await fetch(process.env.KV_REST_API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(['SET', 'timeblock_db', JSON.stringify(data)])
+      });
+      return;
+    } catch (error) {
+      console.error("Error writing to Vercel KV, writing to local file instead:", error);
+    }
+  }
+
   initDb();
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
@@ -46,13 +81,13 @@ initDb();
 // --- Auth Endpoints ---
 
 // Signup
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ message: 'Username and password are required' });
   }
 
-  const db = readDb();
+  const db = await readDb();
   const existingUser = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
   
   if (existingUser) {
@@ -66,19 +101,19 @@ app.post('/api/auth/signup', (req, res) => {
   };
 
   db.users.push(newUser);
-  writeDb(db);
+  await writeDb(db);
 
   res.json({ id: newUser.id, username: newUser.username });
 });
 
 // Login
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ message: 'Username and password are required' });
   }
 
-  const db = readDb();
+  const db = await readDb();
   const user = db.users.find(
     u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
   );
@@ -94,19 +129,19 @@ app.post('/api/auth/login', (req, res) => {
 // --- Task Endpoints ---
 
 // Get tasks for a user
-app.get('/api/tasks', (req, res) => {
+app.get('/api/tasks', async (req, res) => {
   const userId = req.headers['user-id'];
   if (!userId) {
     return res.status(400).json({ message: 'User ID header is required' });
   }
 
-  const db = readDb();
+  const db = await readDb();
   const userTasks = db.tasks.filter(t => t.userId === userId);
   res.json(userTasks);
 });
 
 // Add or update task
-app.post('/api/tasks', (req, res) => {
+app.post('/api/tasks', async (req, res) => {
   const userId = req.headers['user-id'];
   if (!userId) {
     return res.status(400).json({ message: 'User ID header is required' });
@@ -117,7 +152,7 @@ app.post('/api/tasks', (req, res) => {
     return res.status(400).json({ message: 'Task title is required' });
   }
 
-  const db = readDb();
+  const db = await readDb();
   let taskIndex = -1;
 
   if (id) {
@@ -141,19 +176,19 @@ app.post('/api/tasks', (req, res) => {
     db.tasks.push(taskData);
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json(taskData);
 });
 
 // Delete task
-app.delete('/api/tasks/:id', (req, res) => {
+app.delete('/api/tasks/:id', async (req, res) => {
   const userId = req.headers['user-id'];
   const taskId = req.params.id;
   if (!userId) {
     return res.status(400).json({ message: 'User ID header is required' });
   }
 
-  const db = readDb();
+  const db = await readDb();
   const initialLength = db.tasks.length;
   db.tasks = db.tasks.filter(t => !(t.id === taskId && t.userId === userId));
 
@@ -161,7 +196,7 @@ app.delete('/api/tasks/:id', (req, res) => {
     return res.status(404).json({ message: 'Task not found or unauthorized' });
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ message: 'Task deleted successfully' });
 });
 
