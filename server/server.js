@@ -446,6 +446,43 @@ app.get('/api/diary/history', async (req, res) => {
   res.json(entries);
 });
 
+// Delete diary entry for a date
+app.delete('/api/diary', async (req, res) => {
+  const userId = req.headers['user-id'];
+  const date = req.query.date; // YYYY-MM-DD
+  if (!userId || !date) {
+    return res.status(400).json({ message: 'User ID and Date are required' });
+  }
+
+  const db = await getDb();
+  if (db) {
+    try {
+      const diaryCol = db.collection('diary');
+      const result = await diaryCol.deleteOne({ userId, date });
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ message: 'Entry not found or unauthorized' });
+      }
+      return res.json({ message: 'Diary entry deleted successfully' });
+    } catch (error) {
+      console.error("MongoDB delete diary error:", error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  // Local fallback
+  const localDb = await readDb();
+  if (!localDb.diary) localDb.diary = [];
+  const initialLength = localDb.diary.length;
+  localDb.diary = localDb.diary.filter(d => !(d.userId === userId && d.date === date));
+
+  if (localDb.diary.length === initialLength) {
+    return res.status(404).json({ message: 'Entry not found or unauthorized' });
+  }
+
+  await writeDb(localDb);
+  res.json({ message: 'Diary entry deleted successfully' });
+});
+
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Local TimeBlock API server running on http://localhost:${PORT}`);

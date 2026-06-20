@@ -40,6 +40,12 @@ export class DiaryService {
     );
   }
 
+  deleteEntry(date: string): Observable<any> {
+    return this.http.delete<any>(`/api/diary?date=${date}`, { headers: this.getHeaders() }).pipe(
+      tap(() => this.loadHistory())
+    );
+  }
+
   loadHistory(): void {
     const user = this.authService.currentUser();
     if (!user) {

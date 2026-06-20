@@ -55,7 +55,7 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
       </aside>
 
       <!-- Main Editor Panel -->
-      <main class="diary-main glass-panel">
+      <main class="diary-main glass-panel" [class.readonly-mode]="isReadOnly()">
         <!-- Date Selector Header -->
         <header class="diary-header">
           <div class="date-selector">
@@ -71,7 +71,48 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
               </svg>
             </button>
           </div>
-          <button class="btn btn-secondary" (click)="goToToday()">Today</button>
+          <div class="header-actions">
+            <button class="btn btn-secondary" (click)="goToToday()">Today</button>
+            
+            @if (isReadOnly() && entryExists()) {
+              <button class="btn btn-secondary" (click)="enableEdit()" aria-label="Edit diary entry">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+                <span>Edit</span>
+              </button>
+            }
+            
+            @if (!isReadOnly()) {
+              <button class="btn btn-primary" (click)="manualSave()" aria-label="Save diary entry">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                  <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                <span>Save</span>
+              </button>
+              
+              @if (entryExists()) {
+                <button class="btn btn-secondary" (click)="cancelEdit()" aria-label="Cancel editing">
+                  <span>Cancel</span>
+                </button>
+              }
+            }
+            
+            @if (entryExists()) {
+              <button class="btn btn-danger" (click)="deleteCurrentEntry()" aria-label="Delete diary entry">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+                <span>Delete</span>
+              </button>
+            }
+          </div>
         </header>
 
         <!-- Mood Selector Section -->
@@ -83,6 +124,7 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
                 (click)="setMood(m.id)"
                 [class.selected]="selectedMood() === m.id"
                 [class]="'mood-btn mood-' + m.id"
+                [disabled]="isReadOnly()"
                 [attr.aria-label]="'Feel ' + m.label">
                 <span class="mood-emoji">{{ m.emoji }}</span>
                 <span class="mood-label">{{ m.label }}</span>
@@ -98,6 +140,7 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
             placeholder="Give this day a title..." 
             [(ngModel)]="entryTitle" 
             (ngModelChange)="onContentChange()"
+            [readonly]="isReadOnly()"
             class="diary-title-input">
 
           <div class="textarea-container">
@@ -105,24 +148,31 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
               placeholder="Start writing your story for today here... What did you accomplish? How did you feel?"
               [(ngModel)]="entryContent"
               (ngModelChange)="onContentChange()"
+              [readonly]="isReadOnly()"
               class="diary-textarea"
               #editorTextarea></textarea>
             
             <div class="editor-footer">
               <span class="word-count">{{ wordCount() }} words</span>
               <div class="save-status">
-                @if (isSaving()) {
-                  <span class="saving-indicator">
-                    <span class="status-dot saving"></span> Saving...
-                  </span>
-                } @else if (lastSavedTime()) {
-                  <span class="saved-indicator">
-                    <span class="status-dot saved"></span> Auto-saved {{ lastSavedTime() }}
+                @if (isReadOnly()) {
+                  <span class="readonly-indicator">
+                    <span class="status-dot"></span> 🔒 Read-Only
                   </span>
                 } @else {
-                  <span class="draft-indicator">
-                    <span class="status-dot"></span> Unsaved changes
-                  </span>
+                  @if (isSaving()) {
+                    <span class="saving-indicator">
+                      <span class="status-dot saving"></span> Saving...
+                    </span>
+                  } @else if (lastSavedTime()) {
+                    <span class="saved-indicator">
+                      <span class="status-dot saved"></span> Auto-saved {{ lastSavedTime() }}
+                    </span>
+                  } @else {
+                    <span class="draft-indicator">
+                      <span class="status-dot"></span> Unsaved changes
+                    </span>
+                  }
                 }
               </div>
             </div>
@@ -503,6 +553,41 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
       from { opacity: 0.4; }
       to { opacity: 1; }
     }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .readonly-indicator {
+      color: hsl(var(--text-muted));
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 500;
+    }
+
+    /* Read-only editor styling */
+    .readonly-mode .diary-title-input {
+      border-bottom-color: transparent !important;
+      cursor: default;
+    }
+
+    .readonly-mode .diary-textarea {
+      cursor: default;
+    }
+
+    .readonly-mode .mood-btn {
+      opacity: 0.6;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .readonly-mode .mood-btn.selected {
+      opacity: 1;
+      pointer-events: none;
+    }
   `]
 })
 export class DiaryComponent implements OnInit {
@@ -519,6 +604,12 @@ export class DiaryComponent implements OnInit {
   // Status states
   isSaving = signal<boolean>(false);
   lastSavedTime = signal<string>('');
+  isReadOnly = signal<boolean>(true);
+
+  // Computed properties
+  entryExists = computed(() => {
+    return this.diaryService.entries().some(e => e.date === this.selectedDate());
+  });
 
   // Auto-saving subjects
   private autoSaveSubject = new Subject<void>();
@@ -572,11 +663,13 @@ export class DiaryComponent implements OnInit {
           this.entryContent = entry.content;
           this.selectedMood.set(entry.mood);
           this.lastSavedTime.set(this.formatSavedTime(entry.updatedAt));
+          this.isReadOnly.set(true); // Entry exists, view-only mode
         } else {
           this.entryTitle = '';
           this.entryContent = '';
           this.selectedMood.set('');
           this.lastSavedTime.set('');
+          this.isReadOnly.set(false); // No entry exists, default to editing mode
         }
       },
       error: (err) => {
@@ -601,6 +694,10 @@ export class DiaryComponent implements OnInit {
   }
 
   triggerSave(): void {
+    if (this.isReadOnly()) {
+      return;
+    }
+
     // Do not save completely empty entries
     if (!this.entryTitle.trim() && !this.entryContent.trim() && !this.selectedMood()) {
       return;
@@ -643,6 +740,60 @@ export class DiaryComponent implements OnInit {
   goToToday(): void {
     this.triggerSave();
     this.loadEntryForDate(new Date().toISOString().split('T')[0]);
+  }
+
+  enableEdit(): void {
+    this.isReadOnly.set(false);
+  }
+
+  cancelEdit(): void {
+    this.loadEntryForDate(this.selectedDate());
+  }
+
+  manualSave(): void {
+    if (!this.entryTitle.trim() && !this.entryContent.trim() && !this.selectedMood()) {
+      return;
+    }
+
+    this.isSaving.set(true);
+    const entryToSave: DiaryEntry = {
+      date: this.selectedDate(),
+      title: this.entryTitle.trim(),
+      content: this.entryContent.trim(),
+      mood: this.selectedMood()
+    };
+
+    this.diaryService.saveEntry(entryToSave).subscribe({
+      next: (saved) => {
+        this.isSaving.set(false);
+        this.lastSavedTime.set(this.formatSavedTime(saved.updatedAt));
+        this.isReadOnly.set(true); // Lock it upon successful manual save
+      },
+      error: (err) => {
+        this.isSaving.set(false);
+        console.error('Save failed', err);
+      }
+    });
+  }
+
+  deleteCurrentEntry(): void {
+    const date = this.selectedDate();
+    if (!confirm(`Are you sure you want to delete the diary entry for ${this.formatDateReadable(date)}?`)) {
+      return;
+    }
+
+    this.diaryService.deleteEntry(date).subscribe({
+      next: () => {
+        this.entryTitle = '';
+        this.entryContent = '';
+        this.selectedMood.set('');
+        this.lastSavedTime.set('');
+        this.isReadOnly.set(false); // Reset to edit mode as it is now empty
+      },
+      error: (err) => {
+        console.error('Delete failed', err);
+      }
+    });
   }
 
   // Formatting helpers
