@@ -9,7 +9,7 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-const DB_DIR = path.join(__dirname, 'data');
+const DB_DIR = process.env.VERCEL ? '/tmp' : path.join(__dirname, 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
 
 // Initialize database file and folder if not present
@@ -165,6 +165,10 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ message: 'Task deleted successfully' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Local TimeBlock API server running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Local TimeBlock API server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
