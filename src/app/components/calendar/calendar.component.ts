@@ -31,13 +31,13 @@ import { TaskService, Task } from '../../services/task.service';
 
         <div class="calendar-body">
           <div class="weekday-labels">
-            <span>Sunday</span>
-            <span>Monday</span>
-            <span>Tuesday</span>
-            <span>Wednesday</span>
-            <span>Thursday</span>
-            <span>Friday</span>
-            <span>Saturday</span>
+            <span><span class="full-day">Sunday</span><span class="short-day">Sun</span></span>
+            <span><span class="full-day">Monday</span><span class="short-day">Mon</span></span>
+            <span><span class="full-day">Tuesday</span><span class="short-day">Tue</span></span>
+            <span><span class="full-day">Wednesday</span><span class="short-day">Wed</span></span>
+            <span><span class="full-day">Thursday</span><span class="short-day">Thu</span></span>
+            <span><span class="full-day">Friday</span><span class="short-day">Fri</span></span>
+            <span><span class="full-day">Saturday</span><span class="short-day">Sat</span></span>
           </div>
 
           <div class="days-grid">
@@ -46,6 +46,7 @@ import { TaskService, Task } from '../../services/task.service';
                 [class.empty]="day.isEmpty" 
                 [class.today]="day.isToday" 
                 [class.selected]="day.dateString === selectedDate()"
+                [class.has-tasks]="day.tasks.length > 0"
                 (click)="!day.isEmpty && selectDate(day.dateString)"
                 class="day-cell">
                 
@@ -423,6 +424,51 @@ import { TaskService, Task } from '../../services/task.service';
     .drawer-footer {
       border-top: 1px solid hsl(var(--border-color));
       padding-top: 16px;
+    }
+
+    .short-day {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .full-day {
+        display: none;
+      }
+      .short-day {
+        display: inline;
+      }
+      .day-cell {
+        padding: 4px;
+        min-height: 50px;
+        justify-content: space-between;
+      }
+      .cell-tasks-container {
+        display: none;
+      }
+      .day-cell.has-tasks::after {
+        content: "";
+        width: 6px;
+        height: 6px;
+        background-color: hsl(var(--accent-primary));
+        border-radius: 50%;
+        align-self: center;
+        margin-top: auto;
+      }
+      .day-cell.selected.has-tasks::after {
+        background-color: #ffffff;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .month-select-row {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+        text-align: center;
+      }
+      .nav-buttons {
+        justify-content: center;
+      }
     }
   `]
 })

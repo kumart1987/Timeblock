@@ -188,6 +188,17 @@ import { ThemeService } from '../../services/theme.service';
     .theme-btn {
       white-space: nowrap;
     }
+
+    @media (max-width: 576px) {
+      .setting-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .setting-item button {
+        width: 100%;
+      }
+    }
   `]
 })
 export class SettingsComponent implements OnInit {

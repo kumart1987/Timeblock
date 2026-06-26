@@ -343,6 +343,7 @@ import { FormsModule } from '@angular/forms';
       flex-direction: column;
       gap: 20px;
       min-height: 100vh;
+      min-width: 0;
     }
     
     .header-panel {
@@ -444,6 +445,15 @@ import { FormsModule } from '@angular/forms';
       }
       .welcome-badge h1 {
         font-size: 1.15rem;
+      }
+      .header-panel {
+        padding: 0 16px;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .welcome-badge h1 {
+        font-size: 1rem;
       }
     }
   `]

@@ -968,6 +968,25 @@ import { ActivityService, ActivityLog } from '../../services/activity.service';
       border-top: 1px solid hsl(var(--border-color));
       padding-top: 16px;
     }
+
+    @media (max-width: 576px) {
+      .action-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .search-box {
+        max-width: none;
+        width: 100%;
+      }
+      .form-row {
+        flex-direction: column;
+        gap: 12px;
+      }
+      .modal-card {
+        padding: 20px 16px;
+      }
+    }
   `]
 })
 export class DashboardComponent implements OnInit, OnDestroy {

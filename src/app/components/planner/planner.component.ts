@@ -341,6 +341,44 @@ import { ActivityService } from '../../services/activity.service';
       font-size: 0.8rem;
       border-radius: 6px;
     }
+
+    @media (max-width: 576px) {
+      .planner-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+      }
+      .date-selector {
+        justify-content: space-between;
+      }
+      .date-selector h2 {
+        font-size: 1.15rem;
+        min-width: 0;
+      }
+      .quick-add-form {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        width: 100%;
+      }
+      .quick-add-input {
+        width: 100%;
+      }
+      .quick-add-form .priority-select,
+      .quick-add-form .duration-select {
+        width: 100%;
+      }
+      .schedule-row {
+        gap: 10px;
+      }
+      .time-label {
+        width: 55px;
+        font-size: 0.8rem;
+      }
+      .timeblock-item {
+        padding: 8px 12px;
+      }
+    }
   `]
 })
 export class PlannerComponent implements OnInit {

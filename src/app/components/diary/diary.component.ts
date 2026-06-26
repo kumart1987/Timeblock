@@ -713,6 +713,31 @@ export interface ActiveEntryUI {
     .status-dot.saved {
       background-color: hsl(var(--accent-success));
     }
+
+    @media (max-width: 600px) {
+      .diary-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+      }
+      .date-selector {
+        justify-content: space-between;
+      }
+      .date-selector h2 {
+        font-size: 1.15rem;
+        min-width: 0;
+      }
+      .header-actions {
+        justify-content: flex-end;
+      }
+      .diary-main {
+        padding: 16px;
+      }
+      .mood-btn {
+        flex: 1 1 calc(50% - 10px);
+        justify-content: center;
+      }
+    }
   `]
 })
 export class DiaryComponent implements OnInit {
